@@ -1,0 +1,295 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @map("user_id") @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  id_token          String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Role {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  name  String
+  slug  String @unique
+  users User[]
+
+  @@map("roles")
+}
+
+enum BookingStatus {
+  UNSUCCESSFUL
+  PENDING
+  APPROVED
+  COMPLETED
+}
+
+enum ApprovalStatus {
+  UNSUCCESSFUL
+  PENDING
+  APPROVED
+}
+
+enum SocialType {
+  INSTAGRAM
+  TIKTOK
+}
+
+enum MediaType {
+  POST
+  REEL
+  STORY
+  TIKTOK
+}
+
+enum AnalyticsEventType {
+  INFO
+  ERROR
+  SUCCESS
+  IMPORTANT
+}
+
+model User {
+  id                    String                  @id @default(auto()) @map("_id") @db.ObjectId
+  email                 String                  @unique
+  password              String
+  firstName             String
+  lastName              String
+  phoneNumber           String?
+  postalCode            String?
+  city                  String?
+  country               String?
+  region                String?
+  instagramAccountId    String?                 @unique @db.ObjectId
+  instagramAccount      InstagramAccount?       @relation(fields: [instagramAccountId], references: [id])
+  tiktok                String?
+  roleId                String?                 @db.ObjectId
+  role                  Role?                   @relation(fields: [roleId], references: [id])
+  approvalStatus        ApprovalStatus          @default(PENDING)
+  business              Business?               @relation(fields: [businessId], references: [id])
+  businessId            String?                 @db.ObjectId
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  accounts              Account[]
+  sessions              Session[]
+  bookings              Booking[]
+  mediaObject           MediaObject[]
+  instagramVerification InstagramVerification[]
+
+  @@map("users")
+}
+
+model InstagramAccount {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  pageId             String
+  businessAccountId  String
+  pageAccessToken    String
+  userAccessToken    String
+  name               String?
+  biography          String?
+  followersCount     Int
+  profilePictureUrl  String
+  username           String
+  totalImpressions   Int
+  totalReach         Int
+  totalProfileViews  Int
+  totalFollowerCount Int
+  topCountries       Json[]
+  topGenderAge       Json[]
+  topLocale          Json[]
+  expired            Boolean
+  userId             String?  @unique @db.ObjectId
+  deactivated        Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User?
+
+  @@map("instagram-accounts")
+}
+
+model Business {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  logo           String?
+  name           String
+  description    String
+  email          String
+  phoneNumber    String
+  cuisineType    String
+  type           String
+  website        String?
+  instagram      String?
+  tiktok         String?
+  approvalStatus ApprovalStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  users          User[]
+  locations      Location[]
+  listings       Listing[]
+  bookings       Booking[]
+  mediaObject    MediaObject[]
+
+  @@map("businesses")
+}
+
+model Location {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String?
+  street       String
+  city         String
+  country      String
+  region       String
+  postalCode   String
+  phoneNumber  String
+  openingHours Json[]
+  business     Business  @relation(fields: [businessId], references: [id])
+  businessId   String    @db.ObjectId
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  listings     Listing[]
+
+  @@map("locations")
+}
+
+model Listing {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  business      Business  @relation(fields: [businessId], references: [id])
+  businessId    String    @db.ObjectId
+  title         String
+  offer         String
+  deal          String
+  availability  Json
+  redeemAnytime Boolean
+  images        String[]
+  active        Boolean
+  location      Location  @relation(fields: [locationId], references: [id])
+  locationId    String    @db.ObjectId
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  bookings      Booking[]
+
+  @@map("listings")
+}
+
+model Booking {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  user          User          @relation(fields: [userId], references: [id])
+  userId        String        @db.ObjectId
+  timeSlots     Json?
+  confirmedSlot String?
+  redeemed      Boolean
+  status        BookingStatus @default(PENDING)
+  business      Business      @relation(fields: [businessId], references: [id])
+  businessId    String        @db.ObjectId
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  listingId     String        @db.ObjectId
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("bookings")
+}
+
+model ForgotPasswordRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  token     String
+  createdAt DateTime @default(now())
+
+  @@map("forgot-password-requests")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  userType  String
+  createdAt DateTime @default(now())
+
+  @@map("newsletter-subscribers")
+}
+
+model ContactRequest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String
+  email       String
+  phoneNumber String
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@map("contact-requests")
+}
+
+model MediaObject {
+  id                String     @id @default(auto()) @map("_id") @db.ObjectId
+  type              MediaType
+  url               String
+  permalink         String?
+  caption           String?
+  commentsCount     Int?
+  likeCount         Int?
+  thumbnail         String?
+  reach             Int?
+  impressions       Int?
+  totalInteractions Int?
+  social            SocialType
+  user              User       @relation(fields: [userId], references: [id])
+  userId            String     @db.ObjectId
+  business          Business   @relation(fields: [businessId], references: [id])
+  businessId        String     @db.ObjectId
+  createdAt         DateTime   @default(now())
+
+  @@map("media-objects")
+}
+
+model InstagramVerification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  active    Boolean // Use to only activate the verification link (eg: /verify-instagram/[token]) from the dashboard
+  token     String
+  handle    String // The handle provided on the registration
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  @@map("instagram-verifications")
+}
+
+model AnalyticsEvent {
+  id         String              @id @default(auto()) @map("_id") @db.ObjectId
+  eventName  String
+  data       Json?
+  eventType  AnalyticsEventType?
+  distinctId String?
+  createdAt  DateTime            @default(now())
+
+  @@map("analytics-events")
+}
